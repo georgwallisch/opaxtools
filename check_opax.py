@@ -5,13 +5,13 @@ __author__ = "Georg Wallisch"
 __contact__ = "gw@phpco.de"
 __copyright__ = "Copyright © 2019 by Georg Wallisch"
 __credits__ = ["Georg Wallisch"]
-__date__ = "2019/05/21"
+__date__ = "2019/12/14"
 __deprecated__ = False
 __email__ =	 "gw@phpco.de"
 __license__ = "open source software"
 __maintainer__ = "Georg Wallisch"
 __status__ = "alpha"
-__version__ = "0.2"
+__version__ = "0.3"
 
 
 import nagiosplugin
@@ -32,8 +32,8 @@ _log = logging.getLogger('nagiosplugin')
 
 class OPAx(nagiosplugin.Resource, opaxtools.OpaxAccount):
 	
-	def __init__(self, userid, password, host, uri = 'opax/', protocol = 'https'):
-		opaxtools.OpaxAccount.__init__(self, userid, password, host, uri, protocol)	
+	def __init__(self, userid, password, host, uri = 'opax/', protocol = 'https', verify_ssl = True, certificate=None):
+		opaxtools.OpaxAccount.__init__(self, userid, password, host, uri, protocol, verify_ssl, certificate)	
 	
 	def probe(self):
 		try:
@@ -56,6 +56,9 @@ class OPAx(nagiosplugin.Resource, opaxtools.OpaxAccount):
 					for medium in self.loaned:
 						metrics.append(nagiosplugin.Metric(u'Return deadline of "{}" is {}'.format(medium['shortname'].encode('ascii','replace'), medium['deadline'].strftime('%d.%m.%Y')), medium['diff'].days, context='deadline', uom='d'))
 					
+		except requests.exceptions.SSLError as e:
+			print("SSL-Verification of Host {0} failed!".format(self.host))
+			print('Use `--verify-ssl=no` if you want to ignore.')
 		except Exception as e:
 			exc_type, exc_obj, exc_tb = sys.exc_info()
 			fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -89,6 +92,8 @@ def main():
 	argp.add_argument('-t', '--timeout', type=int, default=0,
 					  help='timeout in seconds, default=0 (unlimited)')
 	argp.add_argument("--debug", help="DEBUG Mode", action="store_true")
+	argp.add_argument("--disable-ssl-verfication", help="Disable the security certificate check", action="store_true")
+	argp.add_argument('--certificate', default=None, help='Path to specific cert to use')
 	args = argp.parse_args()
 	
 	if args.debug:
@@ -103,8 +108,13 @@ def main():
 	w_lendings, c_lendings = args.lendings.split(',')
 	w_validity, c_validity = args.validity.split(',')
 	
+	if args.disable_ssl_verfication:
+		verify_ssl = False
+	else:
+		verify_ssl = True
+	
 	check = nagiosplugin.Check(
-		OPAx(args.userid, args.password, args.host, args.uri, args.protocol),
+		OPAx(args.userid, args.password, args.host, args.uri, args.protocol,verify_ssl, args.certificate),
 		nagiosplugin.ScalarContext('deadline', args.warning, args.critical, fmt_metric='{value} days left'),
 		nagiosplugin.ScalarContext('lendings', w_lendings, c_lendings, fmt_metric='{value} mediums loaned'),
 		nagiosplugin.ScalarContext('accountvalidity', w_validity, c_validity, fmt_metric='Account stil {value} days valid')

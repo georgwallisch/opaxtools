@@ -5,13 +5,13 @@ __author__ = "Georg Wallisch"
 __contact__ = "gw@phpco.de"
 __copyright__ = "Copyright © 2019 by Georg Wallisch"
 __credits__ = ["Georg Wallisch"]
-__date__ = "2019/05/21"
+__date__ = "2019/12/14"
 __deprecated__ = False
 __email__ =  "gw@phpco.de"
 __license__ = "open source software"
 __maintainer__ = "Georg Wallisch"
 __status__ = "alpha"
-__version__ = "0.2"
+__version__ = "0.3"
 
 import requests
 import re
@@ -27,20 +27,23 @@ class OpaxAccount:
 	"""Query OPAx Host
 	"""
 	
-	def __init__(self, userid, password, host, uri = 'opax/', protocol = 'https', logger = None):
+	def __init__(self, userid, password, host, uri = 'opax/', protocol = 'https', verify_ssl = True, certificate=None, logger = None):
 		if logger is None:
 			console = logging.StreamHandler()
 			self._log = logging.getLogger('OPAxAccount')
 			self._log.addHandler(console)
 		else:
 			self._log = logger 
-			
+		
 		self._log.info("Constructing new OPAx object")
 		self.userid = userid
 		self.password = password
 		self.host = host
 		self.uri = uri
 		self.protocol = protocol
+		self.verify_ssl = verify_ssl
+		if certificate is not None:
+			self.verify_ssl = certificate
 		self.userpage = None
 		self.lendings = None
 		self.loaned = []
@@ -50,7 +53,11 @@ class OpaxAccount:
 	def get_opaxpage(self, page, payload):
 		hosturl = "{}://{}/{}{}".format(self.protocol, self.host, self.uri, page)
 		self._log.info("querying {}".format(hosturl))
-		r = requests.post(hosturl, data=payload)
+		try:
+			r = requests.post(hosturl, data=payload, verify=self.verify_ssl)
+		except Exception as e:
+			print("Request-Error: {0}".format(e))
+			return None
 		if r:
 			return r.text.decode('UTF-8')
 		else:
